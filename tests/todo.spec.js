@@ -199,3 +199,34 @@ test('Проверка фильтров', async ({ page }) => {
     await expect(page).toHaveURL(/#\/$/)
 
 })
+
+
+test('изменение задачи', async ({ page }) => {
+    // Добавление задач
+    const input = page.getByPlaceholder('What needs to be done?')
+    await input.fill('Молоко')
+    await input.press('Enter')
+    await input.fill('Овощи')
+    await input.press('Enter')
+
+    const todos = page.getByTestId('todo-item')   // строки li
+    const items = page.getByTestId('todo-title')  // тексты задач
+    await expect(items).toHaveText(['Молоко', 'Овощи'])
+
+    const first = todos.nth(0)
+
+    // Вход в режим редактирования
+    await first.getByTestId('todo-title').dblclick()
+    await expect(first).toHaveClass(/editing/)
+
+    const editField = first.getByRole('textbox', { name: 'Edit' })
+    await expect(editField).toHaveValue('Молоко')
+
+    // Изменение и сохранение
+    await editField.fill('Мясо')
+    // await editField.press('Enter')
+
+    // Результат
+    await expect(first).not.toHaveClass(/editing/)
+    await expect(items).toHaveText(['Мясо', 'Овощи'])
+})
