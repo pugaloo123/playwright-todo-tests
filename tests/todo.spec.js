@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test'
+import { ADDRGETNETWORKPARAMS } from 'node:dns';
 
 
 test.beforeEach(async ({ page }) => {
@@ -259,3 +260,152 @@ for (const c of casesForChangeTodo) {
         await expect(items).toHaveText(c.expected)
     })
 }
+
+
+
+
+test.describe('Сохранение после перезагрузки', () => {
+    test('добавленные дела сохраняются', async ({ page }) => {
+        // Добавление задач
+        const input = page.getByPlaceholder('What needs to be done?')
+        await input.fill('Молоко')
+        await input.press('Enter')
+        await input.fill('Овощи')
+        await input.press('Enter')
+
+        await page.reload()
+
+        const todoCount = page.getByTestId('todo-count')
+        await expect(todoCount).toHaveText('2 items left')   // кол-во оставшихся дел
+
+        const items = page.getByTestId('todo-title')
+        await expect(items).toHaveText(['Молоко', 'Овощи']) // Порядок
+    })
+
+    test('отметка выполненным сохраняется', async ({ page }) => {
+        // Добавление задач
+        const input = page.getByPlaceholder('What needs to be done?')
+        await input.fill('Молоко')
+        await input.press('Enter')
+        await input.fill('Овощи')
+        await input.press('Enter')
+        
+        const todos = page.getByTestId('todo-item')
+        const first = todos.nth(0)
+        const second = todos.nth(1)
+
+        const firstCheckbox = first.getByRole('checkbox')
+        const secondCheckbox = second.getByRole('checkbox')
+
+        await firstCheckbox.check()
+
+        await page.reload()
+
+        const todoCount = page.getByTestId('todo-count')
+        await expect(todoCount).toHaveText('1 item left')   // кол-во  оставшихся дел
+
+        const items = page.getByTestId('todo-title')
+        await expect(items).toHaveText(['Молоко', 'Овощи']) // Порядок
+
+        await expect(first).toHaveClass(/completed/)
+        await expect(second).not.toHaveClass(/completed/)
+
+        await expect(firstCheckbox).toBeChecked()
+        await expect(secondCheckbox).not.toBeChecked()
+    })
+
+    test('измененный текст сохраняется', async ({ page }) => {
+        // Добавление задач
+        const input = page.getByPlaceholder('What needs to be done?')
+        await input.fill('Молоко')
+        await input.press('Enter')
+        await input.fill('Овощи')
+        await input.press('Enter')
+
+        const todos = page.getByTestId('todo-item')
+        const first = todos.nth(0)
+
+        // Изменение и сохранение
+        await first.getByTestId('todo-title').dblclick()
+        const editField = first.getByRole('textbox', {name: 'Edit'})
+        await editField.fill('Мясо')
+        await editField.press('Enter')
+
+        await page.reload()
+
+        const todoCount = page.getByTestId('todo-count')
+        await expect(todoCount).toHaveText('2 items left')   // кол-во оставшихся дел
+
+        const items = page.getByTestId('todo-title')
+        await expect(items).toHaveText(['Мясо', 'Овощи']) // Порядок
+    })
+
+    test('Удаление сохраняется', async ({ page }) => {
+        // Добавление задач
+        const input = page.getByPlaceholder('What needs to be done?')
+        await input.fill('Молоко')
+        await input.press('Enter')
+        await input.fill('Овощи')
+        await input.press('Enter')
+
+        const todos = page.getByTestId('todo-item')
+        const first = todos.nth(0)
+
+        //Удаление
+        await first.hover()
+        await first.getByRole('button', { name: "Delete" }).click()
+
+        await page.reload()
+
+        const todoCount = page.getByTestId('todo-count')
+        await expect(todoCount).toHaveText('1 item left')   // кол-во оставшихся дел
+
+        const items = page.getByTestId('todo-title')
+        await expect(items).toHaveText(['Овощи']) 
+    })
+
+    test('Неподтверждённая правка теряется', async ({ page }) => {
+        // Добавление задач
+        const input = page.getByPlaceholder('What needs to be done?')
+        await input.fill('Молоко')
+        await input.press('Enter')
+        await input.fill('Овощи')
+        await input.press('Enter')
+
+        const todos = page.getByTestId('todo-item')
+        const first = todos.nth(0)
+
+        // Изменение
+        await first.getByTestId('todo-title').dblclick()
+        const editField = first.getByRole('textbox', {name: 'Edit'})
+        await editField.fill('Мясо')
+
+        await page.reload()
+
+        const todoCount = page.getByTestId('todo-count')
+        await expect(todoCount).toHaveText('2 items left')   // кол-во оставшихся дел
+
+        const items = page.getByTestId('todo-title')
+        await expect(items).toHaveText(['Молоко', 'Овощи']) 
+
+        await expect(first).not.toHaveClass(/editing/)
+    })
+
+    test('Текст из главного поля теряется', async ({ page }) => {
+        // Добавление задач
+        const input = page.getByPlaceholder('What needs to be done?')
+        await input.fill('Молоко')
+        await input.press('Enter')
+        await input.fill('Овощи')
+
+        await page.reload()
+
+        const todoCount = page.getByTestId('todo-count')
+        await expect(todoCount).toHaveText('1 item left')   // кол-во оставшихся дел
+
+        const items = page.getByTestId('todo-title')
+        await expect(items).toHaveText(['Молоко']) 
+
+        await expect(input).toHaveValue('')
+    })
+})
