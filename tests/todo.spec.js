@@ -64,7 +64,7 @@ test.describe('Корректный ввод', () => {
 
 const casesForEmptyInput = [
     { name: 'пустая строк', input: '' },
-    { name: 'только пробелы', input: '  ',},
+    { name: 'только пробелы', input: '  ', },
 ]
 
 test.describe('Пустой ввод', () => {
@@ -80,7 +80,7 @@ test.describe('Пустой ввод', () => {
             // проверка, что вообще можно добавить дело
             await input.fill('Купить молоко')
             await input.press('Enter')
-            
+
             await expect(items).toHaveText(['Купить молоко'])
         })
     }
@@ -100,14 +100,14 @@ test('Побочные эффекты добавления', async ({ page }) =>
 
     await input.fill('Сладкое')
     await input.press('Enter')
-    
+
     await expect(input).toHaveValue('')
 
     await expect(todoCount).toHaveText('2 items left')
 })
 
 
-test('Отметить дело выполненым', async ({page}) => {
+test('Отметить дело выполненым', async ({ page }) => {
     const input = page.getByPlaceholder('What needs to be done?')
     await input.fill('Молоко')
     await input.press('Enter')
@@ -122,7 +122,7 @@ test('Отметить дело выполненым', async ({page}) => {
 
     const secondCheckbox = second.getByRole('checkbox')
     await secondCheckbox.check()
-    
+
     await expect(secondCheckbox).toBeChecked()
     await expect(second).toHaveClass(/completed/)
     await expect(todos.nth(0)).not.toHaveClass(/completed/)
@@ -153,7 +153,7 @@ test('удаление задачи', async ({ page }) => {
     const second = todos.nth(1)
 
     await second.hover()
-    await second.getByRole('button', {name: "Delete"}).click()
+    await second.getByRole('button', { name: "Delete" }).click()
     await expect(todoCount).toHaveText('2 items left')
 
     await expect(todos).toHaveText(['Молоко', 'Сладкое'])
@@ -178,55 +178,84 @@ test('Проверка фильтров', async ({ page }) => {
     const second = todos.nth(1)
     const secondCheckbox = second.getByRole('checkbox')
     await secondCheckbox.check()
-    
+
     await expect(secondCheckbox).toBeChecked()
     await expect(second).toHaveClass(/completed/)
     await expect(todoCount).toHaveText('2 items left')
 
     //Переключение на вкладку Active
-    await page.getByRole('link', {name: 'Active'}).click()
+    await page.getByRole('link', { name: 'Active' }).click()
     await expect(items).toHaveText(['Молоко', 'Сладкое'])
     await expect(page).toHaveURL(/active/)
 
     //Переключение на вкладку Complete
-    await page.getByRole('link', {name: 'Completed'}).click()
+    await page.getByRole('link', { name: 'Completed' }).click()
     await expect(items).toHaveText(['Овощи'])
     await expect(page).toHaveURL(/completed/)
 
     //Переключаемся обратно на All
-    await page.getByRole('link', {name: 'All'}).click()
+    await page.getByRole('link', { name: 'All' }).click()
     await expect(items).toHaveText(['Молоко', 'Овощи', 'Сладкое'])
     await expect(page).toHaveURL(/#\/$/)
 
 })
 
 
-test('изменение задачи', async ({ page }) => {
-    // Добавление задач
-    const input = page.getByPlaceholder('What needs to be done?')
-    await input.fill('Молоко')
-    await input.press('Enter')
-    await input.fill('Овощи')
-    await input.press('Enter')
+const casesForChangeTodo = [
+    {
+        name: 'Enter сохраняет',
+        newText: 'Мясо',
+        exit: async (editField) => editField.press('Enter'),
+        expected: ['Мясо', 'Овощи']
+    },
+    {
+        name: 'Escape возвращает предыдущее значение',
+        newText: 'Мясо',
+        exit: async (editField, page) => editField.press('Escape'),
+        expected: ['Молоко', 'Овощи']
+    },
+    {
+        name: 'Enter c пустым вводом',
+        newText: '',
+        exit: async (editField, page) => editField.press('Enter'),
+        expected: ['Овощи']
+    },
+    {
+        name: 'Клик по другому месту',
+        newText: 'Мясо',
+        exit: async (editField, page) => page.getByRole('heading', { name: "todos" }).click(),
+        expected: ['Мясо', 'Овощи']
+    }
+]
 
-    const todos = page.getByTestId('todo-item')   // строки li
-    const items = page.getByTestId('todo-title')  // тексты задач
-    await expect(items).toHaveText(['Молоко', 'Овощи'])
+for (const c of casesForChangeTodo) {
+    test(`${c.name}`, async ({ page }) => {
+        // Добавление задач
+        const input = page.getByPlaceholder('What needs to be done?')
+        await input.fill('Молоко')
+        await input.press('Enter')
+        await input.fill('Овощи')
+        await input.press('Enter')
 
-    const first = todos.nth(0)
+        const todos = page.getByTestId('todo-item')   // строки li
+        const items = page.getByTestId('todo-title')  // тексты задач
+        await expect(items).toHaveText(['Молоко', 'Овощи'])
 
-    // Вход в режим редактирования
-    await first.getByTestId('todo-title').dblclick()
-    await expect(first).toHaveClass(/editing/)
+        const first = todos.nth(0)
 
-    const editField = first.getByRole('textbox', { name: 'Edit' })
-    await expect(editField).toHaveValue('Молоко')
+        // Вход в режим редактирования
+        await first.getByTestId('todo-title').dblclick()
+        await expect(first).toHaveClass(/editing/)
 
-    // Изменение и сохранение
-    await editField.fill('Мясо')
-    // await editField.press('Enter')
+        const editField = first.getByRole('textbox', { name: 'Edit' })
+        await expect(editField).toHaveValue('Молоко')
 
-    // Результат
-    await expect(first).not.toHaveClass(/editing/)
-    await expect(items).toHaveText(['Мясо', 'Овощи'])
-})
+        // Изменение и сохранение
+        await editField.fill(c.newText)
+        await c.exit(editField, page)
+
+        // Результат
+        await expect(page.locator('li.editing')).toHaveCount(0)
+        await expect(items).toHaveText(c.expected)
+    })
+}
